@@ -69,6 +69,24 @@ def init_db():
 
 
 # ------------------------------------------------------------------ #
+# Users                                                              #
+# ------------------------------------------------------------------ #
+
+def create_user(name, email, password):
+    """Insert a new user with a hashed password and return the new id.
+
+    Raises sqlite3.IntegrityError if the email is already registered.
+    """
+    with closing(get_db()) as db:
+        cursor = db.execute(
+            "INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)",
+            (name, email, generate_password_hash(password)),
+        )
+        db.commit()
+        return cursor.lastrowid
+
+
+# ------------------------------------------------------------------ #
 # Database Seeding                                                   #
 # ------------------------------------------------------------------ #
 
