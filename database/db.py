@@ -1,6 +1,24 @@
+import os
 import sqlite3
+from contextlib import closing
+from datetime import date
 
-DATABASE = "expense_tracker.db"
+from werkzeug.security import generate_password_hash
+
+DATABASE = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "expense_tracker.db",
+)
+
+CATEGORIES = [
+    "Food",
+    "Transport",
+    "Bills",
+    "Health",
+    "Entertainment",
+    "Shopping",
+    "Other",
+]
 
 
 # ------------------------------------------------------------------ #
@@ -20,38 +38,34 @@ def get_db():
 # ------------------------------------------------------------------ #
 
 def init_db():
-    """Initialize database with schema."""
-    db = get_db()
-    cursor = db.cursor()
-
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    """Create tables if they do not exist."""
+    with closing(get_db()) as db:
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now'))
+            )
+            """
         )
-        """
-    )
-
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS expenses (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            amount REAL NOT NULL,
-            category TEXT NOT NULL,
-            description TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS expenses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                amount REAL NOT NULL,
+                category TEXT NOT NULL,
+                date TEXT NOT NULL,
+                description TEXT,
+                created_at TEXT DEFAULT (datetime('now')),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
         )
-        """
-    )
-
-    db.commit()
-    db.close()
+        db.commit()
 
 
 # ------------------------------------------------------------------ #
@@ -59,45 +73,36 @@ def init_db():
 # ------------------------------------------------------------------ #
 
 def seed_db():
-    """Seed database with sample data for development."""
-    db = get_db()
-    cursor = db.cursor()
+    """Insert a demo user and sample expenses once."""
+    with closing(get_db()) as db:
+        if db.execute("SELECT COUNT(*) FROM users").fetchone()[0] > 0:
+            return
 
-    cursor.execute("SELECT COUNT(*) FROM users")
-    if cursor.fetchone()[0] > 0:
-        db.close()
-        return
-
-    sample_users = [
-        ("alice@example.com", "hashed_password_1"),
-        ("bob@example.com", "hashed_password_2"),
-    ]
-
-    for email, password in sample_users:
-        cursor.execute(
-            "INSERT INTO users (email, password) VALUES (?, ?)",
-            (email, password),
+        cursor = db.execute(
+            "INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)",
+            ("Demo User", "demo@spendly.com", generate_password_hash("demo123")),
         )
+        user_id = cursor.lastrowid
 
-    db.commit()
-
-    cursor.execute("SELECT id FROM users LIMIT 1")
-    user_id = cursor.fetchone()[0]
-
-    sample_expenses = [
-        (user_id, 50.00, "Food", "Lunch at cafe"),
-        (user_id, 30.00, "Transport", "Gas for car"),
-        (user_id, 100.00, "Entertainment", "Movie tickets"),
-    ]
-
-    for user_id, amount, category, description in sample_expenses:
-        cursor.execute(
+        today = date.today()
+        samples = [
+            (450.00, "Food", 1, "Groceries"),
+            (120.00, "Transport", 3, "Metro card recharge"),
+            (1800.00, "Bills", 5, "Electricity bill"),
+            (650.00, "Health", 8, "Pharmacy"),
+            (900.00, "Entertainment", 12, "Movie and dinner"),
+            (2200.00, "Shopping", 15, "New shoes"),
+            (300.00, "Other", 18, "Gift wrapping and cards"),
+            (220.00, "Food", 22, "Lunch with friends"),
+        ]
+        db.executemany(
             """
-            INSERT INTO expenses (user_id, amount, category, description)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO expenses (user_id, amount, category, date, description)
+            VALUES (?, ?, ?, ?, ?)
             """,
-            (user_id, amount, category, description),
+            [
+                (user_id, amount, category, today.replace(day=day).isoformat(), desc)
+                for amount, category, day, desc in samples
+            ],
         )
-
-    db.commit()
-    db.close()
+        db.commit()
