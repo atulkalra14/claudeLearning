@@ -186,4 +186,4 @@ Use exactly these values:
 - [ ]  No duplicate seed data on repeated runs
 - [ ]  App starts without errors
 - [ ]  Foreign key enforcement works
-- [ ]  All queries use parameterized SQL
+- [ ]  All queries use parameterized SQL!!!
