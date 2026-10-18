@@ -6,6 +6,9 @@
 
 <section class="hero">
     <div class="hero-inner">
+        {% for category, message in get_flashed_messages(with_categories=true) %}
+        <div class="auth-{{ category }}">{{ message }}</div>
+        {% endfor %}
         <div class="hero-badge">Personal Finance Tracker</div>
         <h1 class="hero-title">
             Know where your<br>

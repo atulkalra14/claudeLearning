@@ -86,6 +86,14 @@ def create_user(name, email, password):
         return cursor.lastrowid
 
 
+def get_user_by_email(email):
+    """Return the user row matching email, or None if there is no match."""
+    with closing(get_db()) as db:
+        return db.execute(
+            "SELECT * FROM users WHERE email = ?", (email,)
+        ).fetchone()
+
+
 # ------------------------------------------------------------------ #
 # Database Seeding                                                   #
 # ------------------------------------------------------------------ #
