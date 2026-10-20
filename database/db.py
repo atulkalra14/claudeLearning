@@ -25,6 +25,7 @@ CATEGORIES = [
 # Database Connection                                                #
 # ------------------------------------------------------------------ #
 
+
 def get_db():
     """Get database connection with row factory and foreign keys enabled."""
     db = sqlite3.connect(DATABASE)
@@ -37,11 +38,11 @@ def get_db():
 # Database Initialization                                            #
 # ------------------------------------------------------------------ #
 
+
 def init_db():
     """Create tables if they do not exist."""
     with closing(get_db()) as db:
-        db.execute(
-            """
+        db.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
@@ -49,10 +50,8 @@ def init_db():
                 password_hash TEXT NOT NULL,
                 created_at TEXT DEFAULT (datetime('now'))
             )
-            """
-        )
-        db.execute(
-            """
+            """)
+        db.execute("""
             CREATE TABLE IF NOT EXISTS expenses (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
@@ -63,14 +62,14 @@ def init_db():
                 created_at TEXT DEFAULT (datetime('now')),
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
-            """
-        )
+            """)
         db.commit()
 
 
 # ------------------------------------------------------------------ #
 # Users                                                              #
 # ------------------------------------------------------------------ #
+
 
 def create_user(name, email, password):
     """Insert a new user with a hashed password and return the new id.
@@ -89,80 +88,109 @@ def create_user(name, email, password):
 def get_user_by_email(email):
     """Return the user row matching email, or None if there is no match."""
     with closing(get_db()) as db:
-        return db.execute(
-            "SELECT * FROM users WHERE email = ?", (email,)
-        ).fetchone()
+        return db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
 
 
 def get_user_by_id(user_id):
     """Return the user row matching id, or None if there is no match."""
     with closing(get_db()) as db:
-        return db.execute(
-            "SELECT * FROM users WHERE id = ?", (user_id,)
-        ).fetchone()
+        return db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
 
 
 # ------------------------------------------------------------------ #
 # Expenses                                                           #
 # ------------------------------------------------------------------ #
 
-def get_recent_expenses(user_id, limit=10):
-    """Return the user's most recent expenses, newest first."""
+
+def _date_clause(date_from, date_to):
+    """Return (sql_fragment, params) for an optional inclusive date range.
+
+    Dates are ISO YYYY-MM-DD strings. Only fixed SQL fragments are returned;
+    the values themselves always travel as bound parameters.
+    """
+    clause = ""
+    params = []
+    if date_from:
+        clause += " AND date >= ?"
+        params.append(date_from)
+    if date_to:
+        clause += " AND date <= ?"
+        params.append(date_to)
+    return clause, params
+
+
+def get_recent_expenses(user_id, limit=10, date_from=None, date_to=None):
+    """Return the user's most recent expenses, newest first.
+
+    date_from and date_to optionally restrict the range (inclusive).
+    """
+    clause, params = _date_clause(date_from, date_to)
     with closing(get_db()) as db:
         return db.execute(
-            """
+            f"""
             SELECT date, description, category, amount
             FROM expenses
-            WHERE user_id = ?
+            WHERE user_id = ?{clause}
             ORDER BY date DESC, id DESC
             LIMIT ?
             """,
-            (user_id, limit),
+            (user_id, *params, limit),
         ).fetchall()
 
 
-def get_expense_summary(user_id):
+def get_expense_summary(user_id, date_from=None, date_to=None):
     """Return (total_spent, transaction_count, top_category) for the user.
 
     total_spent is 0 and top_category is None when there are no expenses.
+    date_from and date_to optionally restrict the range (inclusive).
     """
+    clause, params = _date_clause(date_from, date_to)
     with closing(get_db()) as db:
         total, count = db.execute(
-            "SELECT COALESCE(SUM(amount), 0), COUNT(*) FROM expenses WHERE user_id = ?",
-            (user_id,),
+            f"""
+            SELECT COALESCE(SUM(amount), 0), COUNT(*)
+            FROM expenses
+            WHERE user_id = ?{clause}
+            """,
+            (user_id, *params),
         ).fetchone()
         top = db.execute(
-            """
+            f"""
             SELECT category
             FROM expenses
-            WHERE user_id = ?
+            WHERE user_id = ?{clause}
             GROUP BY category
             ORDER BY SUM(amount) DESC
             LIMIT 1
             """,
-            (user_id,),
+            (user_id, *params),
         ).fetchone()
         return total, count, top["category"] if top else None
 
 
-def get_category_totals(user_id):
-    """Return (category, total) rows for the user, largest total first."""
+def get_category_totals(user_id, date_from=None, date_to=None):
+    """Return (category, total) rows for the user, largest total first.
+
+    date_from and date_to optionally restrict the range (inclusive).
+    """
+    clause, params = _date_clause(date_from, date_to)
     with closing(get_db()) as db:
         return db.execute(
-            """
+            f"""
             SELECT category, SUM(amount) AS total
             FROM expenses
-            WHERE user_id = ?
+            WHERE user_id = ?{clause}
             GROUP BY category
             ORDER BY total DESC
             """,
-            (user_id,),
+            (user_id, *params),
         ).fetchall()
 
 
 # ------------------------------------------------------------------ #
 # Database Seeding                                                   #
 # ------------------------------------------------------------------ #
+
 
 def seed_db():
     """Insert a demo user and sample expenses once."""

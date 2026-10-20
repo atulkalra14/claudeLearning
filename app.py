@@ -1,14 +1,28 @@
 import sqlite3
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 from flask import (
-    Flask, abort, flash, redirect, render_template, request, session, url_for,
+    Flask,
+    abort,
+    flash,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
 )
 from werkzeug.security import check_password_hash
 
 from database.db import (
-    create_user, get_category_totals, get_db, get_expense_summary,
-    get_recent_expenses, get_user_by_email, get_user_by_id, init_db, seed_db,
+    create_user,
+    get_category_totals,
+    get_db,
+    get_expense_summary,
+    get_recent_expenses,
+    get_user_by_email,
+    get_user_by_id,
+    init_db,
+    seed_db,
 )
 
 app = Flask(__name__)
@@ -20,8 +34,56 @@ with app.app_context():
 
 
 # ------------------------------------------------------------------ #
+# Helpers                                                             #
+# ------------------------------------------------------------------ #
+
+
+def _validate_iso_date(value):
+    """Return value as a canonical YYYY-MM-DD string, or None if empty/invalid.
+
+    The canonical form matters: dates are compared as text in SQL.
+    """
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").strftime("%Y-%m-%d")
+    except (TypeError, ValueError):
+        return None
+
+
+def _get_date_range():
+    """Read the optional from/to query params as (date_from, date_to).
+
+    Invalid values are ignored. If the range is reversed, flash an error and
+    return (None, None) so the unfiltered data is shown.
+    """
+    date_from = _validate_iso_date(request.args.get("from", ""))
+    date_to = _validate_iso_date(request.args.get("to", ""))
+    if date_from and date_to and date_from > date_to:
+        flash("Start date must be on or before end date", "error")
+        return None, None
+    return date_from, date_to
+
+
+def _build_presets(today):
+    """Return the quick-filter links shown above the profile stats."""
+    ranges = [
+        ("This month", today.replace(day=1).isoformat(), today.isoformat()),
+        ("Last 30 days", (today - timedelta(days=30)).isoformat(), today.isoformat()),
+    ]
+    presets = [
+        {
+            "label": label,
+            "url": url_for("profile", **{"from": start, "to": end}),
+        }
+        for label, start, end in ranges
+    ]
+    presets.append({"label": "All time", "url": url_for("profile")})
+    return presets
+
+
+# ------------------------------------------------------------------ #
 # Routes                                                              #
 # ------------------------------------------------------------------ #
+
 
 @app.route("/")
 def landing():
@@ -115,8 +177,19 @@ def profile():
         "name": row["name"],
         "email": row["email"],
         "initials": "".join(w[0] for w in row["name"].split()[:2]).upper(),
-        "member_since": datetime.strptime(row["created_at"], "%Y-%m-%d %H:%M:%S").strftime("%B %Y"),
+        "member_since": datetime.strptime(
+            row["created_at"], "%Y-%m-%d %H:%M:%S"
+        ).strftime("%B %Y"),
     }
+
+    date_from, date_to = _get_date_range()
+    range_kwargs = {"date_from": date_from, "date_to": date_to}
+    filters = {
+        "date_from": date_from or "",
+        "date_to": date_to or "",
+        "active": bool(date_from or date_to),
+    }
+    presets = _build_presets(date.today())
 
     # ===== SECTION 1: TRANSACTIONS (subagent 1) =====
     transactions = [
@@ -126,12 +199,12 @@ def profile():
             "category": row["category"],
             "amount": float(row["amount"]),
         }
-        for row in get_recent_expenses(user_id)
+        for row in get_recent_expenses(user_id, **range_kwargs)
     ]
     # ===== END SECTION 1 =====
 
     # ===== SECTION 2: SUMMARY (subagent 2) =====
-    total, count, top = get_expense_summary(user_id)
+    total, count, top = get_expense_summary(user_id, **range_kwargs)
     stats = {
         "total_spent": float(total or 0),
         "transaction_count": count,
@@ -140,13 +213,15 @@ def profile():
     # ===== END SECTION 2 =====
 
     # ===== SECTION 3: CATEGORIES (subagent 3) =====
-    category_rows = get_category_totals(user_id)
+    category_rows = get_category_totals(user_id, **range_kwargs)
     grand_total = sum(float(row["total"]) for row in category_rows)
     categories = [
         {
             "name": row["category"],
             "total": float(row["total"]),
-            "percent": round(float(row["total"]) / grand_total * 100) if grand_total else 0,
+            "percent": (
+                round(float(row["total"]) / grand_total * 100) if grand_total else 0
+            ),
         }
         for row in category_rows
     ]
@@ -158,6 +233,8 @@ def profile():
         stats=stats,
         transactions=transactions,
         categories=categories,
+        filters=filters,
+        presets=presets,
     )
 
 
