@@ -94,6 +94,72 @@ def get_user_by_email(email):
         ).fetchone()
 
 
+def get_user_by_id(user_id):
+    """Return the user row matching id, or None if there is no match."""
+    with closing(get_db()) as db:
+        return db.execute(
+            "SELECT * FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+
+
+# ------------------------------------------------------------------ #
+# Expenses                                                           #
+# ------------------------------------------------------------------ #
+
+def get_recent_expenses(user_id, limit=10):
+    """Return the user's most recent expenses, newest first."""
+    with closing(get_db()) as db:
+        return db.execute(
+            """
+            SELECT date, description, category, amount
+            FROM expenses
+            WHERE user_id = ?
+            ORDER BY date DESC, id DESC
+            LIMIT ?
+            """,
+            (user_id, limit),
+        ).fetchall()
+
+
+def get_expense_summary(user_id):
+    """Return (total_spent, transaction_count, top_category) for the user.
+
+    total_spent is 0 and top_category is None when there are no expenses.
+    """
+    with closing(get_db()) as db:
+        total, count = db.execute(
+            "SELECT COALESCE(SUM(amount), 0), COUNT(*) FROM expenses WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+        top = db.execute(
+            """
+            SELECT category
+            FROM expenses
+            WHERE user_id = ?
+            GROUP BY category
+            ORDER BY SUM(amount) DESC
+            LIMIT 1
+            """,
+            (user_id,),
+        ).fetchone()
+        return total, count, top["category"] if top else None
+
+
+def get_category_totals(user_id):
+    """Return (category, total) rows for the user, largest total first."""
+    with closing(get_db()) as db:
+        return db.execute(
+            """
+            SELECT category, SUM(amount) AS total
+            FROM expenses
+            WHERE user_id = ?
+            GROUP BY category
+            ORDER BY total DESC
+            """,
+            (user_id,),
+        ).fetchall()
+
+
 # ------------------------------------------------------------------ #
 # Database Seeding                                                   #
 # ------------------------------------------------------------------ #

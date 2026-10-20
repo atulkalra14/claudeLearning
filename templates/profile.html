@@ -34,6 +34,7 @@
 
         <div class="profile-panel">
             <h2 class="panel-title">Recent transactions</h2>
+            {% if transactions %}
             <div class="table-scroll">
                 <table class="tx-table">
                     <thead>
@@ -56,10 +57,14 @@
                     </tbody>
                 </table>
             </div>
+            {% else %}
+            <p class="empty-state">No expenses yet</p>
+            {% endif %}
         </div>
 
         <div class="profile-panel">
             <h2 class="panel-title">Spending by category</h2>
+            {% if categories %}
             <ul class="cat-list">
                 {% for cat in categories %}
                 <li class="cat-row">
@@ -69,6 +74,9 @@
                 </li>
                 {% endfor %}
             </ul>
+            {% else %}
+            <p class="empty-state">No expenses yet</p>
+            {% endif %}
         </div>
 
     </div>

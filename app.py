@@ -1,11 +1,15 @@
 import sqlite3
+from datetime import datetime
 
 from flask import (
     Flask, abort, flash, redirect, render_template, request, session, url_for,
 )
 from werkzeug.security import check_password_hash
 
-from database.db import create_user, get_db, get_user_by_email, init_db, seed_db
+from database.db import (
+    create_user, get_category_totals, get_db, get_expense_summary,
+    get_recent_expenses, get_user_by_email, get_user_by_id, init_db, seed_db,
+)
 
 app = Flask(__name__)
 app.secret_key = "dev-secret-key-change-me"  # dev only; move to env config later
@@ -96,47 +100,58 @@ def logout():
     return redirect(url_for("landing"))
 
 
-# ------------------------------------------------------------------ #
-# Placeholder routes — students will implement these                  #
-# ------------------------------------------------------------------ #
-
-
 @app.route("/profile")
 def profile():
-    if not session.get("user_id"):
+    user_id = session.get("user_id")
+    if not user_id:
         return redirect(url_for("login"))
 
-    # Hardcoded UI data — real queries are wired up in Step 5.
+    row = get_user_by_id(user_id)
+    if row is None:
+        session.clear()
+        return redirect(url_for("login"))
+
     user = {
-        "name": "Demo User",
-        "email": "demo@spendly.com",
-        "initials": "DU",
-        "member_since": "January 2026",
+        "name": row["name"],
+        "email": row["email"],
+        "initials": "".join(w[0] for w in row["name"].split()[:2]).upper(),
+        "member_since": datetime.strptime(row["created_at"], "%Y-%m-%d %H:%M:%S").strftime("%B %Y"),
     }
-    stats = {
-        "total_spent": 6640.00,
-        "transaction_count": 8,
-        "top_category": "Shopping",
-    }
+
+    # ===== SECTION 1: TRANSACTIONS (subagent 1) =====
     transactions = [
-        {"date": "22 Oct 2026", "description": "Lunch with friends", "category": "Food", "amount": 220.00},
-        {"date": "18 Oct 2026", "description": "Gift wrapping and cards", "category": "Other", "amount": 300.00},
-        {"date": "15 Oct 2026", "description": "New shoes", "category": "Shopping", "amount": 2200.00},
-        {"date": "12 Oct 2026", "description": "Movie and dinner", "category": "Entertainment", "amount": 900.00},
-        {"date": "08 Oct 2026", "description": "Pharmacy", "category": "Health", "amount": 650.00},
-        {"date": "05 Oct 2026", "description": "Electricity bill", "category": "Bills", "amount": 1800.00},
-        {"date": "03 Oct 2026", "description": "Metro card recharge", "category": "Transport", "amount": 120.00},
-        {"date": "01 Oct 2026", "description": "Groceries", "category": "Food", "amount": 450.00},
+        {
+            "date": datetime.strptime(row["date"], "%Y-%m-%d").strftime("%d %b %Y"),
+            "description": row["description"] or "",
+            "category": row["category"],
+            "amount": float(row["amount"]),
+        }
+        for row in get_recent_expenses(user_id)
     ]
+    # ===== END SECTION 1 =====
+
+    # ===== SECTION 2: SUMMARY (subagent 2) =====
+    total, count, top = get_expense_summary(user_id)
+    stats = {
+        "total_spent": float(total or 0),
+        "transaction_count": count,
+        "top_category": top or "\u2014",
+    }
+    # ===== END SECTION 2 =====
+
+    # ===== SECTION 3: CATEGORIES (subagent 3) =====
+    category_rows = get_category_totals(user_id)
+    grand_total = sum(float(row["total"]) for row in category_rows)
     categories = [
-        {"name": "Shopping", "total": 2200.00, "percent": 33},
-        {"name": "Bills", "total": 1800.00, "percent": 27},
-        {"name": "Entertainment", "total": 900.00, "percent": 14},
-        {"name": "Food", "total": 670.00, "percent": 10},
-        {"name": "Health", "total": 650.00, "percent": 10},
-        {"name": "Other", "total": 300.00, "percent": 5},
-        {"name": "Transport", "total": 120.00, "percent": 2},
+        {
+            "name": row["category"],
+            "total": float(row["total"]),
+            "percent": round(float(row["total"]) / grand_total * 100) if grand_total else 0,
+        }
+        for row in category_rows
     ]
+    # ===== END SECTION 3 =====
+
     return render_template(
         "profile.html",
         user=user,
@@ -144,6 +159,11 @@ def profile():
         transactions=transactions,
         categories=categories,
     )
+
+
+# ------------------------------------------------------------------ #
+# Placeholder routes — students will implement these                  #
+# ------------------------------------------------------------------ #
 
 
 @app.route("/expenses/add")
