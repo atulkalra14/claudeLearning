@@ -22,4 +22,5 @@ def client(app):
 def login(client):
     def _login(email="demo@spendly.com", password="demo123"):
         return client.post("/login", data={"email": email, "password": password})
+
     return _login

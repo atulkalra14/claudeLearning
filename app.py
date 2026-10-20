@@ -2,13 +2,27 @@ import sqlite3
 from datetime import datetime
 
 from flask import (
-    Flask, abort, flash, redirect, render_template, request, session, url_for,
+    Flask,
+    abort,
+    flash,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
 )
 from werkzeug.security import check_password_hash
 
 from database.db import (
-    create_user, get_category_totals, get_db, get_expense_summary,
-    get_recent_expenses, get_user_by_email, get_user_by_id, init_db, seed_db,
+    create_user,
+    get_category_totals,
+    get_db,
+    get_expense_summary,
+    get_recent_expenses,
+    get_user_by_email,
+    get_user_by_id,
+    init_db,
+    seed_db,
 )
 
 app = Flask(__name__)
@@ -22,6 +36,7 @@ with app.app_context():
 # ------------------------------------------------------------------ #
 # Routes                                                              #
 # ------------------------------------------------------------------ #
+
 
 @app.route("/")
 def landing():
@@ -115,7 +130,9 @@ def profile():
         "name": row["name"],
         "email": row["email"],
         "initials": "".join(w[0] for w in row["name"].split()[:2]).upper(),
-        "member_since": datetime.strptime(row["created_at"], "%Y-%m-%d %H:%M:%S").strftime("%B %Y"),
+        "member_since": datetime.strptime(
+            row["created_at"], "%Y-%m-%d %H:%M:%S"
+        ).strftime("%B %Y"),
     }
 
     # ===== SECTION 1: TRANSACTIONS (subagent 1) =====
@@ -146,7 +163,9 @@ def profile():
         {
             "name": row["category"],
             "total": float(row["total"]),
-            "percent": round(float(row["total"]) / grand_total * 100) if grand_total else 0,
+            "percent": (
+                round(float(row["total"]) / grand_total * 100) if grand_total else 0
+            ),
         }
         for row in category_rows
     ]

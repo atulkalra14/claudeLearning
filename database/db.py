@@ -25,6 +25,7 @@ CATEGORIES = [
 # Database Connection                                                #
 # ------------------------------------------------------------------ #
 
+
 def get_db():
     """Get database connection with row factory and foreign keys enabled."""
     db = sqlite3.connect(DATABASE)
@@ -37,11 +38,11 @@ def get_db():
 # Database Initialization                                            #
 # ------------------------------------------------------------------ #
 
+
 def init_db():
     """Create tables if they do not exist."""
     with closing(get_db()) as db:
-        db.execute(
-            """
+        db.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
@@ -49,10 +50,8 @@ def init_db():
                 password_hash TEXT NOT NULL,
                 created_at TEXT DEFAULT (datetime('now'))
             )
-            """
-        )
-        db.execute(
-            """
+            """)
+        db.execute("""
             CREATE TABLE IF NOT EXISTS expenses (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
@@ -63,14 +62,14 @@ def init_db():
                 created_at TEXT DEFAULT (datetime('now')),
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
-            """
-        )
+            """)
         db.commit()
 
 
 # ------------------------------------------------------------------ #
 # Users                                                              #
 # ------------------------------------------------------------------ #
+
 
 def create_user(name, email, password):
     """Insert a new user with a hashed password and return the new id.
@@ -89,22 +88,19 @@ def create_user(name, email, password):
 def get_user_by_email(email):
     """Return the user row matching email, or None if there is no match."""
     with closing(get_db()) as db:
-        return db.execute(
-            "SELECT * FROM users WHERE email = ?", (email,)
-        ).fetchone()
+        return db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
 
 
 def get_user_by_id(user_id):
     """Return the user row matching id, or None if there is no match."""
     with closing(get_db()) as db:
-        return db.execute(
-            "SELECT * FROM users WHERE id = ?", (user_id,)
-        ).fetchone()
+        return db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
 
 
 # ------------------------------------------------------------------ #
 # Expenses                                                           #
 # ------------------------------------------------------------------ #
+
 
 def get_recent_expenses(user_id, limit=10):
     """Return the user's most recent expenses, newest first."""
@@ -163,6 +159,7 @@ def get_category_totals(user_id):
 # ------------------------------------------------------------------ #
 # Database Seeding                                                   #
 # ------------------------------------------------------------------ #
+
 
 def seed_db():
     """Insert a demo user and sample expenses once."""

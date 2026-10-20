@@ -2,10 +2,15 @@ from database import db
 
 
 def register(client, name, email):
-    return client.post("/register", data={
-        "name": name, "email": email,
-        "password": "password123", "confirm_password": "password123",
-    })
+    return client.post(
+        "/register",
+        data={
+            "name": name,
+            "email": email,
+            "password": "password123",
+            "confirm_password": "password123",
+        },
+    )
 
 
 def test_profile_requires_login(client):
