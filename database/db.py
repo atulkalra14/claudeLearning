@@ -102,57 +102,88 @@ def get_user_by_id(user_id):
 # ------------------------------------------------------------------ #
 
 
-def get_recent_expenses(user_id, limit=10):
-    """Return the user's most recent expenses, newest first."""
+def _date_clause(date_from, date_to):
+    """Return (sql_fragment, params) for an optional inclusive date range.
+
+    Dates are ISO YYYY-MM-DD strings. Only fixed SQL fragments are returned;
+    the values themselves always travel as bound parameters.
+    """
+    clause = ""
+    params = []
+    if date_from:
+        clause += " AND date >= ?"
+        params.append(date_from)
+    if date_to:
+        clause += " AND date <= ?"
+        params.append(date_to)
+    return clause, params
+
+
+def get_recent_expenses(user_id, limit=10, date_from=None, date_to=None):
+    """Return the user's most recent expenses, newest first.
+
+    date_from and date_to optionally restrict the range (inclusive).
+    """
+    clause, params = _date_clause(date_from, date_to)
     with closing(get_db()) as db:
         return db.execute(
-            """
+            f"""
             SELECT date, description, category, amount
             FROM expenses
-            WHERE user_id = ?
+            WHERE user_id = ?{clause}
             ORDER BY date DESC, id DESC
             LIMIT ?
             """,
-            (user_id, limit),
+            (user_id, *params, limit),
         ).fetchall()
 
 
-def get_expense_summary(user_id):
+def get_expense_summary(user_id, date_from=None, date_to=None):
     """Return (total_spent, transaction_count, top_category) for the user.
 
     total_spent is 0 and top_category is None when there are no expenses.
+    date_from and date_to optionally restrict the range (inclusive).
     """
+    clause, params = _date_clause(date_from, date_to)
     with closing(get_db()) as db:
         total, count = db.execute(
-            "SELECT COALESCE(SUM(amount), 0), COUNT(*) FROM expenses WHERE user_id = ?",
-            (user_id,),
+            f"""
+            SELECT COALESCE(SUM(amount), 0), COUNT(*)
+            FROM expenses
+            WHERE user_id = ?{clause}
+            """,
+            (user_id, *params),
         ).fetchone()
         top = db.execute(
-            """
+            f"""
             SELECT category
             FROM expenses
-            WHERE user_id = ?
+            WHERE user_id = ?{clause}
             GROUP BY category
             ORDER BY SUM(amount) DESC
             LIMIT 1
             """,
-            (user_id,),
+            (user_id, *params),
         ).fetchone()
         return total, count, top["category"] if top else None
 
 
-def get_category_totals(user_id):
-    """Return (category, total) rows for the user, largest total first."""
+def get_category_totals(user_id, date_from=None, date_to=None):
+    """Return (category, total) rows for the user, largest total first.
+
+    date_from and date_to optionally restrict the range (inclusive).
+    """
+    clause, params = _date_clause(date_from, date_to)
     with closing(get_db()) as db:
         return db.execute(
-            """
+            f"""
             SELECT category, SUM(amount) AS total
             FROM expenses
-            WHERE user_id = ?
+            WHERE user_id = ?{clause}
             GROUP BY category
             ORDER BY total DESC
             """,
-            (user_id,),
+            (user_id, *params),
         ).fetchall()
 
 
