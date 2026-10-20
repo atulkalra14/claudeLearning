@@ -4,13 +4,75 @@
 
 {% block content %}
 
-<section class="auth-section">
-    <div class="auth-container">
-        <div class="auth-header">
-            <h1 class="auth-title">Profile</h1>
-            <p class="auth-subtitle">Profile page — coming in Step 4</p>
+<section class="profile-page">
+
+    <div class="profile-card">
+        <div class="profile-avatar">{{ user.initials }}</div>
+        <div class="profile-info">
+            <h1 class="profile-name">{{ user.name }}</h1>
+            <p class="profile-email">{{ user.email }}</p>
+            <p class="profile-since">Member since {{ user.member_since }}</p>
         </div>
     </div>
+
+    <div class="stat-row">
+        <div class="stat-card">
+            <span class="stat-label">Total spent</span>
+            <span class="stat-value">₹{{ "{:,.2f}".format(stats.total_spent) }}</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">Transactions</span>
+            <span class="stat-value">{{ stats.transaction_count }}</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">Top category</span>
+            <span class="stat-value">{{ stats.top_category }}</span>
+        </div>
+    </div>
+
+    <div class="profile-grid">
+
+        <div class="profile-panel">
+            <h2 class="panel-title">Recent transactions</h2>
+            <div class="table-scroll">
+                <table class="tx-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Description</th>
+                            <th>Category</th>
+                            <th class="num">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tx in transactions %}
+                        <tr>
+                            <td class="tx-date">{{ tx.date }}</td>
+                            <td>{{ tx.description }}</td>
+                            <td><span class="badge badge-{{ tx.category|lower }}">{{ tx.category }}</span></td>
+                            <td class="num">₹{{ "{:,.2f}".format(tx.amount) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="profile-panel">
+            <h2 class="panel-title">Spending by category</h2>
+            <ul class="cat-list">
+                {% for cat in categories %}
+                <li class="cat-row">
+                    <span class="cat-name">{{ cat.name }}</span>
+                    <progress class="cat-bar cat-bar-{{ cat.name|lower }}" value="{{ cat.percent }}" max="100">{{ cat.percent }}%</progress>
+                    <span class="cat-amount">₹{{ "{:,.2f}".format(cat.total) }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+    </div>
+
 </section>
 
 {% endblock %}
