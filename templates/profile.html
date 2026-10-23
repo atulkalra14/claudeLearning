@@ -21,6 +21,10 @@
     <div class="auth-{{ category }}">{{ message }}</div>
     {% endfor %}
 
+    <div class="profile-actions">
+        <a class="btn-primary" href="{{ url_for('add_expense') }}">Add expense</a>
+    </div>
+
     <form class="filter-bar" method="get" action="{{ url_for('profile') }}">
         <div class="filter-field">
             <label for="filter-from">From</label>

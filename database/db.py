@@ -119,6 +119,20 @@ def _date_clause(date_from, date_to):
     return clause, params
 
 
+def create_expense(user_id, amount, category, expense_date, description):
+    """Insert an expense for the user and return the new id."""
+    with closing(get_db()) as db:
+        cursor = db.execute(
+            """
+            INSERT INTO expenses (user_id, amount, category, date, description)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (user_id, amount, category, expense_date, description),
+        )
+        db.commit()
+        return cursor.lastrowid
+
+
 def get_recent_expenses(user_id, limit=10, date_from=None, date_to=None):
     """Return the user's most recent expenses, newest first.
 
