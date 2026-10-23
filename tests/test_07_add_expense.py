@@ -24,7 +24,9 @@ def expense_count():
 
 def latest_expense():
     with closing(db.get_db()) as conn:
-        return conn.execute("SELECT * FROM expenses ORDER BY id DESC LIMIT 1").fetchone()
+        return conn.execute(
+            "SELECT * FROM expenses ORDER BY id DESC LIMIT 1"
+        ).fetchone()
 
 
 def register(client, name, email):

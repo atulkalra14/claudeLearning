@@ -305,7 +305,10 @@ class TestTransactionLimit:
     def test_limit_of_10_applies_under_filter(self, known, client, login):
         _insert(
             DEMO_ID,
-            [(10.0, "Other", f"2026-04-{i:02d}", f"Bulk{i:02d}x") for i in range(1, 13)],
+            [
+                (10.0, "Other", f"2026-04-{i:02d}", f"Bulk{i:02d}x")
+                for i in range(1, 13)
+            ],
         )
         login()
         resp = _get(client, "?from=2026-04-01&to=2026-04-30")
@@ -358,7 +361,9 @@ class TestDbHelpers:
         assert [r["description"] for r in rows] == ["OtherUserSecret"]
 
     def test_summary_unchanged_when_none(self, known):
-        total, count, top = db.get_expense_summary(DEMO_ID, date_from=None, date_to=None)
+        total, count, top = db.get_expense_summary(
+            DEMO_ID, date_from=None, date_to=None
+        )
         assert (total, count) == (1500.0, 5)
         assert top in ("Food", "Health")  # tied at 500 each
         assert db.get_expense_summary(DEMO_ID) == (total, count, top)
@@ -394,10 +399,14 @@ class TestDbHelpers:
         ]
 
     def test_category_totals_scoped_to_user(self, known):
-        rows = db.get_category_totals(known, date_from="2026-02-01", date_to="2026-02-28")
+        rows = db.get_category_totals(
+            known, date_from="2026-02-01", date_to="2026-02-28"
+        )
         assert [(r["category"], r["total"]) for r in rows] == [("Shopping", 9999.0)]
 
-    @pytest.mark.parametrize("bad", ["2026-01-01' OR '1'='1", "'; DROP TABLE expenses;--"])
+    @pytest.mark.parametrize(
+        "bad", ["2026-01-01' OR '1'='1", "'; DROP TABLE expenses;--"]
+    )
     def test_helpers_treat_values_as_data(self, known, bad):
         assert db.get_recent_expenses(DEMO_ID, date_from=bad) is not None
         db.get_expense_summary(DEMO_ID, date_to=bad)
