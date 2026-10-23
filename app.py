@@ -20,12 +20,14 @@ from database.db import (
     create_user,
     get_category_totals,
     get_db,
+    get_expense,
     get_expense_summary,
     get_recent_expenses,
     get_user_by_email,
     get_user_by_id,
     init_db,
     seed_db,
+    update_expense,
 )
 
 app = Flask(__name__)
@@ -128,6 +130,20 @@ def _parse_expense_form(form):
         "expense_date": expense_date,
         "description": description,
     }, None
+
+
+def _expense_form_context(form, heading, subtitle, submit_label, form_action):
+    """Return the template context shared by the add and edit expense forms."""
+    return {
+        "categories": CATEGORIES,
+        "form": form,
+        "max_amount": MAX_AMOUNT,
+        "max_description": MAX_DESCRIPTION_LENGTH,
+        "heading": heading,
+        "subtitle": subtitle,
+        "submit_label": submit_label,
+        "form_action": form_action,
+    }
 
 
 # ------------------------------------------------------------------ #
@@ -244,6 +260,7 @@ def profile():
     # ===== SECTION 1: TRANSACTIONS (subagent 1) =====
     transactions = [
         {
+            "id": row["id"],
             "date": datetime.strptime(row["date"], "%Y-%m-%d").strftime("%d %b %Y"),
             "description": row["description"] or "",
             "category": row["category"],
@@ -324,16 +341,53 @@ def add_expense():
 
     return render_template(
         "add_expense.html",
-        categories=CATEGORIES,
-        form=form,
-        max_amount=MAX_AMOUNT,
-        max_description=MAX_DESCRIPTION_LENGTH,
+        **_expense_form_context(
+            form,
+            "Add an expense",
+            "Record what you spent",
+            "Add expense",
+            url_for("add_expense"),
+        ),
     )
 
 
-@app.route("/expenses/<int:id>/edit")
+@app.route("/expenses/<int:id>/edit", methods=["GET", "POST"])
 def edit_expense(id):
-    return "Edit expense — coming in Step 8"
+    user_id = _current_user_id()
+    if user_id is None:
+        return redirect(url_for("login"))
+
+    expense = get_expense(user_id, id)
+    if expense is None:
+        abort(404)
+
+    form = {
+        "amount": f"{expense['amount']:.2f}",
+        "category": expense["category"],
+        "date": expense["date"],
+        "description": expense["description"] or "",
+    }
+
+    if request.method == "POST":
+        values, error = _parse_expense_form(request.form)
+        if error is None:
+            if not update_expense(user_id, id, **values):
+                abort(404)
+            flash("Expense updated", "success")
+            return redirect(url_for("profile"))
+        flash(error, "error")
+        form = {key: request.form.get(key, "") for key in EXPENSE_FORM_FIELDS}
+
+    return render_template(
+        "add_expense.html",
+        **_expense_form_context(
+            form,
+            "Edit expense",
+            "Update the details",
+            "Save changes",
+            url_for("edit_expense", id=id),
+        ),
+    )
 
 
 @app.route("/expenses/<int:id>/delete")
