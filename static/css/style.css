@@ -785,6 +785,26 @@ a {
   text-decoration: underline;
 }
 
+.tx-delete-form {
+  display: inline;
+  margin-left: 0.75rem;
+}
+
+.tx-delete {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--danger);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.tx-delete:hover {
+  text-decoration: underline;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
