@@ -164,6 +164,20 @@ def update_expense(user_id, expense_id, amount, category, expense_date, descript
         return cursor.rowcount == 1
 
 
+def delete_expense(user_id, expense_id):
+    """Delete the user's expense and return True if a row was removed.
+
+    Returns False when the expense does not exist or belongs to someone else.
+    """
+    with closing(get_db()) as db:
+        cursor = db.execute(
+            "DELETE FROM expenses WHERE id = ? AND user_id = ?",
+            (expense_id, user_id),
+        )
+        db.commit()
+        return cursor.rowcount == 1
+
+
 def get_recent_expenses(user_id, limit=10, date_from=None, date_to=None):
     """Return the user's most recent expenses, newest first.
 
