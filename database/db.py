@@ -133,6 +133,37 @@ def create_expense(user_id, amount, category, expense_date, description):
         return cursor.lastrowid
 
 
+def get_expense(user_id, expense_id):
+    """Return the expense row if it belongs to the user, else None."""
+    with closing(get_db()) as db:
+        return db.execute(
+            """
+            SELECT id, amount, category, date, description
+            FROM expenses
+            WHERE id = ? AND user_id = ?
+            """,
+            (expense_id, user_id),
+        ).fetchone()
+
+
+def update_expense(user_id, expense_id, amount, category, expense_date, description):
+    """Update the user's expense and return True if a row was changed.
+
+    Returns False when the expense does not exist or belongs to someone else.
+    """
+    with closing(get_db()) as db:
+        cursor = db.execute(
+            """
+            UPDATE expenses
+            SET amount = ?, category = ?, date = ?, description = ?
+            WHERE id = ? AND user_id = ?
+            """,
+            (amount, category, expense_date, description, expense_id, user_id),
+        )
+        db.commit()
+        return cursor.rowcount == 1
+
+
 def get_recent_expenses(user_id, limit=10, date_from=None, date_to=None):
     """Return the user's most recent expenses, newest first.
 
@@ -142,7 +173,7 @@ def get_recent_expenses(user_id, limit=10, date_from=None, date_to=None):
     with closing(get_db()) as db:
         return db.execute(
             f"""
-            SELECT date, description, category, amount
+            SELECT id, date, description, category, amount
             FROM expenses
             WHERE user_id = ?{clause}
             ORDER BY date DESC, id DESC
