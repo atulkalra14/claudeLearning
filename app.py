@@ -1,3 +1,4 @@
+import math
 import sqlite3
 from datetime import date, datetime, timedelta
 
@@ -14,6 +15,8 @@ from flask import (
 from werkzeug.security import check_password_hash
 
 from database.db import (
+    CATEGORIES,
+    create_expense,
     create_user,
     get_category_totals,
     get_db,
@@ -36,6 +39,21 @@ with app.app_context():
 # ------------------------------------------------------------------ #
 # Helpers                                                             #
 # ------------------------------------------------------------------ #
+
+MAX_AMOUNT = 10_000_000
+MAX_DESCRIPTION_LENGTH = 200
+EXPENSE_FORM_FIELDS = ("amount", "category", "date", "description")
+
+
+def _current_user_id():
+    """Return the signed-in user's id, or None if logged out or the user is gone."""
+    user_id = session.get("user_id")
+    if user_id is None:
+        return None
+    if get_user_by_id(user_id) is None:
+        session.clear()
+        return None
+    return user_id
 
 
 def _validate_iso_date(value):
@@ -78,6 +96,38 @@ def _build_presets(today):
     ]
     presets.append({"label": "All time", "url": url_for("profile")})
     return presets
+
+
+def _parse_expense_form(form):
+    """Validate the add-expense form and return (values, error).
+
+    values is a dict ready for create_expense when error is None.
+    """
+    try:
+        amount = float(form.get("amount", "").strip())
+    except ValueError:
+        return None, "Enter a valid amount"
+    if not math.isfinite(amount) or amount <= 0:
+        return None, "Amount must be greater than 0"
+    if amount > MAX_AMOUNT:
+        return None, f"Amount must be at most {MAX_AMOUNT:,}"
+
+    category = form.get("category", "")
+    if category not in CATEGORIES:
+        return None, "Choose a valid category"
+
+    expense_date = _validate_iso_date(form.get("date", "").strip())
+    if expense_date is None:
+        return None, "Enter a valid date"
+
+    description = form.get("description", "").strip()[:MAX_DESCRIPTION_LENGTH] or None
+
+    return {
+        "amount": round(amount, 2),
+        "category": category,
+        "expense_date": expense_date,
+        "description": description,
+    }, None
 
 
 # ------------------------------------------------------------------ #
@@ -250,9 +300,35 @@ def analytics():
 # ------------------------------------------------------------------ #
 
 
-@app.route("/expenses/add")
+@app.route("/expenses/add", methods=["GET", "POST"])
 def add_expense():
-    return "Add expense — coming in Step 7"
+    user_id = _current_user_id()
+    if user_id is None:
+        return redirect(url_for("login"))
+
+    form = {
+        "amount": "",
+        "category": "",
+        "date": date.today().isoformat(),
+        "description": "",
+    }
+
+    if request.method == "POST":
+        values, error = _parse_expense_form(request.form)
+        if error is None:
+            create_expense(user_id, **values)
+            flash("Expense added", "success")
+            return redirect(url_for("profile"))
+        flash(error, "error")
+        form = {key: request.form.get(key, "") for key in EXPENSE_FORM_FIELDS}
+
+    return render_template(
+        "add_expense.html",
+        categories=CATEGORIES,
+        form=form,
+        max_amount=MAX_AMOUNT,
+        max_description=MAX_DESCRIPTION_LENGTH,
+    )
 
 
 @app.route("/expenses/<int:id>/edit")
